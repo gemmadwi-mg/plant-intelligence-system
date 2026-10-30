@@ -12,7 +12,7 @@
 ## 📌 Executive Summary
 Sistem ini dirancang untuk mengotomatisasi pemrosesan data kinerja operasional pabrik (*Data Pipeline/ETL*), memvisualisasikan *Overall Equipment Effectiveness* (OEE), serta memprediksi risiko kerusakan mesin berbasis sensor (*Predictive Maintenance*) menggunakan Machine Learning.
 
-Project ini dikembangkan sebagai portofolio kualifikasi **Plant Performance Administrator - PT Semen Indonesia (Persero) Tbk.**
+
 
 ---
 
