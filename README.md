@@ -5,7 +5,7 @@
 [![scikit-learn](https://img.shields.io/badge/scikit--learn-1.5.1-orange.svg)](https://scikit-learn.org)
 [![Docker](https://img.shields.io/badge/Docker-Ready-blue.svg)](https://docker.com)
 
-**Live Demo:** [http://IP_PUBLIC_VPS_KAMU](http://IP_PUBLIC_VPS_KAMU)
+**Live Demo:** [https://hris.103.197.189.156.nip.io/analytics/](https://hris.103.197.189.156.nip.io/analytics/)
 
 ---
 
@@ -37,16 +37,6 @@ Sistem ini mengotomatisasi pengolahan data kinerja operasional pabrik (**ETL**),
 
 ---
 
-## 🏗️ Arsitektur
-
-```mermaid
-flowchart TD
-    A[Raw Data Logs<br/>CSV / Excel] --> B[ETL Engine<br/>Python + Pandas]
-    B --> C[AI / ML Engine<br/>Random Forest]
-    B --> D[Streamlit Dashboard<br/>Plotly]
-    C --> D
-    D --> E[Docker Container]
-```
 
 ## 🔄 Cara Kerja
 
