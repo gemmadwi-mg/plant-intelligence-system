@@ -6,6 +6,15 @@ from src.ml_engine import PredictiveMaintenanceModel
 
 st.set_page_config(page_title="Enterprise Plant Performance & AI Analytics", layout="wide", page_icon="🏭")
 
+
+@st.cache_resource(show_spinner=False)
+def train_model(data):
+    """Dilatih sekali per dataset (bukan setiap interaksi widget) dan memakai data penuh, bukan data terfilter."""
+    model = PredictiveMaintenanceModel()
+    metrics, msg = model.train(data)
+    return model, metrics, msg
+
+
 st.title("🏭 Plant Performance Intelligence & AI Maintenance System")
 st.caption("Arsitektur Portofolio Advance: Gemma Dwi Prasetya | S1 Teknik Informatika (Data Engineering & ML)")
 
@@ -31,8 +40,21 @@ except Exception as e:
     st.error(f"Error Processing Data: {e}")
     st.stop()
 
+for w in etl.warnings:
+    st.sidebar.warning(w)
+
+df_all = df  # data penuh (sebelum filter) untuk pelatihan model
+
 # Sidebar Filters
 st.sidebar.header("🔍 Dynamic Filter Operations")
+n_anomaly = int(df["data_anomaly"].sum()) if "data_anomaly" in df.columns else 0
+if n_anomaly:
+    if st.sidebar.checkbox(
+        f"Kecualikan {n_anomaly} baris anomali dari KPI, alert & grafik",
+        value=False,
+        help="Baris anomali: downtime melebihi jadwal produksi, atau defect melebihi jumlah produksi.",
+    ):
+        df = PlantDataETL.exclude_anomalies(df)
 if "production_line" in df.columns:
     lines = st.sidebar.multiselect("Pilih Lini Produksi:", options=df["production_line"].unique(), default=df["production_line"].unique())
     df = df[df["production_line"].isin(lines)]
@@ -40,6 +62,10 @@ if "production_line" in df.columns:
 if "shift" in df.columns:
     shifts = st.sidebar.multiselect("Pilih Shift Operasional:", options=df["shift"].unique(), default=df["shift"].unique())
     df = df[df["shift"].isin(shifts)]
+
+if df.empty:
+    st.warning("Tidak ada data yang tersisa setelah filter diterapkan.")
+    st.stop()
 
 # FITUR TAMBAHAN 1: AUTOMATED ALERT & NOTIFICATION SYSTEM
 alerts = PlantDataETL.generate_alerts(df, oee_threshold=80.0)
@@ -81,11 +107,22 @@ with tab1:
 # TAB 2: MACHINE LEARNING PREDICTIVE MAINTENANCE
 with tab2:
     st.header("🤖 Machine Learning Model: Machine Failure Prediction")
-    ml = PredictiveMaintenanceModel()
-    acc, msg = ml.train(df)
+    ml, metrics, msg = train_model(df_all)
 
-    if acc is not None:
-        st.success(f"Status Model: {msg} | Akurasi Model Evaluasi: **{acc}%**")
+    if metrics is not None:
+        st.success(f"Status Model: {msg}")
+        c1, c2, c3, c4 = st.columns(4)
+        c1.metric("Recall (kerusakan tertangkap)", f"{metrics['recall']}%")
+        c2.metric("Precision", f"{metrics['precision']}%")
+        c3.metric("F1-Score", f"{metrics['f1']}%")
+        c4.metric("Akurasi", f"{metrics['accuracy']}%", help=f"Bila model selalu menjawab 'normal', akurasi = {metrics['baseline_accuracy']}%. Gunakan Recall/F1 sebagai ukuran utama.")
+        st.caption(
+            f"Evaluasi: stratified {metrics['folds']}-fold cross-validation diulang {metrics['repeats']}x (rata-rata) pada "
+            f"{metrics['n']} baris ({metrics['n_pos']} kasus risiko tinggi), threshold keputusan {metrics['threshold']}. "
+            f"Rata-rata terdeteksi {metrics['tp']:.1f} dari {metrics['n_pos']} kasus; alarm palsu {metrics['fp']:.1f}."
+        )
+        if metrics['n_pos'] < 20:
+            st.info("Jumlah kasus risiko tinggi sangat sedikit, sehingga metrik di atas masih berupa perkiraan kasar.")
 
         st.subheader("⚡ Simulator Prediksi Risiko Mesin Real-time")
         col_sim1, col_sim2, col_sim3 = st.columns(3)
@@ -95,10 +132,11 @@ with tab2:
 
         if st.button("Jalankan Prediksi Risiko Mesin"):
             res = ml.predict_risk(vibr, temp, downt)
+            prob = ml.predict_proba(vibr, temp, downt)
             if "TINGGI" in res:
-                st.error(f"Hasil Diagnosa ML: {res}")
+                st.error(f"Hasil Diagnosa ML: {res} (probabilitas {prob * 100:.0f}%)")
             else:
-                st.success(f"Hasil Diagnosa ML: {res}")
+                st.success(f"Hasil Diagnosa ML: {res} (probabilitas {prob * 100:.0f}%)")
     else:
         st.warning(msg)
 

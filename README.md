@@ -32,6 +32,7 @@ Sistem ini mengotomatisasi pengolahan data kinerja operasional pabrik (**ETL**),
 - **Dashboard eksekutif** — tren OEE harian terhadap target world-class 85% dan breakdown downtime per lini dan shift.
 - **Predictive Maintenance** — Random Forest Classifier memprediksi risiko kerusakan dari getaran, suhu, dan histori downtime, lengkap dengan simulator real-time.
 - **Alert otomatis** — peringatan untuk setiap baris data dengan OEE di bawah 80%.
+- **Validasi data** — baris tidak valid (kosong, non-numerik, `planned_time`/`target` ≤ 0, nilai negatif) dibuang dan sensor dengan nilai mustahil dikosongkan, disertai peringatan di sidebar. Baris yang lolos tetapi tidak konsisten (downtime melebihi jadwal produksi, atau defect melebihi produksi) ditandai di kolom `data_anomaly` dan bisa dikecualikan dari KPI, alert, dan grafik lewat checkbox di sidebar.
 - **Filter dinamis** — saring berdasarkan lini produksi dan shift.
 - **Laporan eksekutif** — unduh Excel multi-sheet atau CSV hasil transformasi.
 
@@ -55,7 +56,9 @@ Membaca CSV/Excel, memvalidasi kolom wajib, lalu menghitung:
 - Model: `RandomForestClassifier` (100 pohon, `random_state=42`)
 - Fitur: `vibration_mm_s`, `temperature_celsius`, `downtime_hrs`
 - Target: `failure_risk` (0 = normal, 1 = risiko breakdown tinggi)
-- Pembagian data: 80% training, 20% testing
+- Evaluasi: *stratified 5-fold cross-validation* yang diulang 5x dengan seed berbeda, hasilnya dirata-rata. Kelas risiko hanya ±3% dari data (9 dari 270 baris), sehingga satu split train/test berisi hanya ~3 kasus positif dan hasilnya tidak stabil.
+- Ukuran utama: **recall** (kerusakan yang tertangkap), precision, dan F1. Akurasi tidak dipakai sebagai ukuran utama karena model yang selalu menjawab "normal" pun sudah mendapat ±96,7%.
+- Threshold keputusan 0,3 (bukan 0,5): kerusakan yang terlewat lebih mahal daripada alarm palsu. Model final dilatih pada seluruh data (bukan data terfilter) dan di-cache.
 
 ---
 
@@ -68,7 +71,11 @@ Membaca CSV/Excel, memvalidasi kolom wajib, lalu menghitung:
 | Availability | 90,00% |
 | Quality rate | 97,14% |
 | Alert OEE < 80% | 155 peringatan |
-| Akurasi model ML | **94,44%** |
+| Recall model ML (CV) | **±100%** (9 dari 9 kasus risiko) |
+| Precision / F1 (CV) | ±85% / ±91% |
+| Alarm palsu | ±1,8 dari 260 baris normal |
+
+> Catatan: metrik ML dihitung dari hanya 9 kasus risiko tinggi, jadi anggap sebagai perkiraan kasar, bukan jaminan performa di data baru.
 
 Dataset default berisi 270 baris: 3 lini produksi (Alpha/Kiln 1, Beta/Kiln 2, Gamma/Finish Mill 1) × 3 shift × data harian.
 
@@ -82,6 +89,8 @@ plant-intelligence-system/
 ├── src/
 │   ├── etl_pipeline.py             # Ingestion, KPI/OEE, alert, export Excel
 │   └── ml_engine.py                # Model Predictive Maintenance
+├── tests/
+│   └── test_pipeline.py            # Unit test ETL dan model ML
 ├── data/
 │   └── plant_performance_advance_kaggle.csv
 ├── Dockerfile
@@ -120,6 +129,12 @@ streamlit run app.py
 ```
 
 Buka `http://localhost:8501`.
+
+### Menjalankan Tes
+
+```bash
+python -m unittest discover -s tests -v
+```
 
 ### Docker
 
