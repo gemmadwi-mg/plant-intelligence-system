@@ -40,7 +40,8 @@ except Exception as e:
     st.error(f"Error Processing Data: {e}")
     st.stop()
 
-for w in etl.warnings:
+# Menghindari AttributeError jika etl.warnings belum/tidak terdefinisi
+for w in getattr(etl, 'warnings', []):
     st.sidebar.warning(w)
 
 df_all = df  # data penuh (sebelum filter) untuk pelatihan model
@@ -55,6 +56,7 @@ if n_anomaly:
         help="Baris anomali: downtime melebihi jadwal produksi, atau defect melebihi jumlah produksi.",
     ):
         df = PlantDataETL.exclude_anomalies(df)
+
 if "production_line" in df.columns:
     lines = st.sidebar.multiselect("Pilih Lini Produksi:", options=df["production_line"].unique(), default=df["production_line"].unique())
     df = df[df["production_line"].isin(lines)]
@@ -71,7 +73,7 @@ if df.empty:
 alerts = PlantDataETL.generate_alerts(df, oee_threshold=80.0)
 with st.expander(f"🔔 Notification Center & Anomaly Alert ({len(alerts)} Peringatan)", expanded=bool(alerts)):
     if alerts:
-        for alert in alerts[:5]: # Tampilkan 5 alert pertama
+        for alert in alerts[:5]:  # Tampilkan 5 alert pertama
             st.warning(alert)
         if len(alerts) > 5:
             st.info(f"Dan {len(alerts) - 5} alert performa rendah lainnya tersimpan di log system.")
